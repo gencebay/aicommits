@@ -39,17 +39,7 @@ export default () =>
 		s.start('The AI is analyzing your changes');
 		let messages: string[];
 		try {
-			messages = await generateCommitMessage(
-				config.OPENAI_KEY,
-				config.model,
-				config.locale,
-				staged!.diff,
-				config.generate,
-				config['max-length'],
-				config.type,
-				config.timeout,
-				config.proxy
-			);
+			messages = await generateCommitMessage(config, staged!.diff);
 		} finally {
 			s.stop('Changes analyzed');
 		}

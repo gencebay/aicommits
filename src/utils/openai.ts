@@ -4,18 +4,13 @@ import type {
 	CreateChatCompletionRequest,
 	CreateChatCompletionResponse,
 } from 'openai';
-import {
-	type TiktokenModel,
-	// encoding_for_model,
-} from '@dqbd/tiktoken';
 import createHttpsProxyAgent from 'https-proxy-agent';
 import { KnownError } from './error.js';
-import type { CommitType } from './config.js';
+import type { ValidConfig } from './config.js';
 import { generatePrompt } from './prompt.js';
 
 const httpsPost = async (
-	hostname: string,
-	path: string,
+	url: string,
 	headers: Record<string, string>,
 	json: unknown,
 	timeout: number,
@@ -28,10 +23,9 @@ const httpsPost = async (
 	}>((resolve, reject) => {
 		const postContent = JSON.stringify(json);
 		const request = https.request(
+			url,
 			{
 				port: 443,
-				hostname,
-				path,
 				method: 'POST',
 				headers: {
 					...headers,
@@ -68,17 +62,20 @@ const httpsPost = async (
 	});
 
 const createChatCompletion = async (
+	useAzure: boolean,
+	url: string,
 	apiKey: string,
 	json: CreateChatCompletionRequest,
 	timeout: number,
 	proxy?: string
 ) => {
+	const headers: Record<string, string> = useAzure
+		? { 'api-key': apiKey }
+		: { Authorization: `Bearer ${apiKey}` };
+
 	const { response, data } = await httpsPost(
-		'api.openai.com',
-		'/v1/chat/completions',
-		{
-			Authorization: `Bearer ${apiKey}`,
-		},
+		url,
+		headers,
 		json,
 		timeout,
 		proxy
@@ -89,7 +86,7 @@ const createChatCompletion = async (
 		response.statusCode < 200 ||
 		response.statusCode > 299
 	) {
-		let errorMessage = `OpenAI API Error: ${response.statusCode} - ${response.statusMessage}`;
+		let errorMessage = `API Error: ${response.statusCode} - ${response.statusMessage}`;
 
 		if (data) {
 			errorMessage += `\n\n${data}`;
@@ -113,37 +110,32 @@ const sanitizeMessage = (message: string) =>
 
 const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
 
-// const generateStringFromLength = (length: number) => {
-// 	let result = '';
-// 	const highestTokenChar = 'z';
-// 	for (let i = 0; i < length; i += 1) {
-// 		result += highestTokenChar;
-// 	}
-// 	return result;
-// };
-
-// const getTokens = (prompt: string, model: TiktokenModel) => {
-// 	const encoder = encoding_for_model(model);
-// 	const tokens = encoder.encode(prompt).length;
-// 	// Free the encoder to avoid possible memory leaks.
-// 	encoder.free();
-// 	return tokens;
-// };
-
 export const generateCommitMessage = async (
-	apiKey: string,
-	model: TiktokenModel,
-	locale: string,
-	diff: string,
-	completions: number,
-	maxLength: number,
-	type: CommitType,
-	timeout: number,
-	proxy?: string
+	config: ValidConfig,
+	diff: string
 ) => {
+	const {
+		OPENAI_KEY: apiKey,
+		USE_AZURE: useAzure,
+		AZURE_OPENAI_KEY: azureKey,
+		proxy,
+		generate: completions,
+		timeout,
+		locale,
+		'max-length': maxLength,
+		model,
+		type,
+	} = config;
+
 	try {
+		const url = useAzure
+			? config.AZURE_OPENAI_ENDPOINT
+			: 'https://api.openai.com/v1/chat/completions';
+
 		const completion = await createChatCompletion(
-			apiKey,
+			useAzure,
+			url,
+			useAzure ? azureKey! : apiKey!,
 			{
 				model,
 				messages: [

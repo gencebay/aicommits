@@ -118,6 +118,70 @@ export default testSuite(({ describe }) => {
 			expect(stdout).toBe(openAiToken);
 		});
 
+		await describe('USE_AZURE', ({ test }) => {
+			test('setting invalid USE_AZURE', async () => {
+				const { stderr } = await aicommits(['config', 'set', 'USE_AZURE=1'], {
+					reject: false,
+				});
+				expect(stderr).toMatch(/Must be true or false/i);
+			});
+
+			test('updates config', async () => {
+				const defaultConfig = await aicommits(['config', 'get', 'USE_AZURE']);
+				expect(defaultConfig.stdout).toBe('USE_AZURE=false');
+
+				const useAzure = 'USE_AZURE=true';
+				await aicommits(['config', 'set', useAzure]);
+
+				const configFile = await fs.readFile(configPath, 'utf8');
+				expect(configFile).toMatch(useAzure);
+
+				const get = await aicommits(['config', 'get', 'USE_AZURE']);
+				expect(get.stdout).toBe(useAzure);
+			});
+		});
+
+		await describe('AZURE_OPENAI_KEY', ({ test }) => {
+			test('updates config', async () => {
+				const defaultConfig = await aicommits(['config', 'get', 'AZURE_OPENAI_KEY']);
+				expect(defaultConfig.stdout).toBe('AZURE_OPENAI_KEY=');
+
+				const azureOpenAIKey = 'AZURE_OPENAI_KEY=azure-key';
+				await aicommits(['config', 'set', azureOpenAIKey]);
+
+				const configFile = await fs.readFile(configPath, 'utf8');
+				expect(configFile).toMatch(azureOpenAIKey);
+
+				const get = await aicommits(['config', 'get', 'AZURE_OPENAI_KEY']);
+				expect(get.stdout).toBe(azureOpenAIKey);
+			});
+		});
+
+		await describe('AZURE_OPENAI_ENDPOINT', ({ test }) => {
+			test('setting invalid AZURE_OPENAI_ENDPOINT', async () => {
+				const { stderr } = await aicommits(
+					['config', 'set', 'AZURE_OPENAI_ENDPOINT=foo://bar'],
+					{ reject: false }
+				);
+				expect(stderr).toMatch(/Must be a valid URL/i);
+			});
+
+			test('updates config', async () => {
+				const defaultConfig = await aicommits(['config', 'get', 'AZURE_OPENAI_ENDPOINT']);
+				expect(defaultConfig.stdout).toBe('AZURE_OPENAI_ENDPOINT=');
+
+				const endpoint = 'https://demo.openai.azure.com/openai/deployments/my-latest-deployment/chat/completions?api-version=2024-08-01-preview';
+				const azureEndpoint = `AZURE_OPENAI_ENDPOINT='${endpoint}'`;
+				await aicommits(['config', 'set', azureEndpoint]);
+
+				const configFile = await fs.readFile(configPath, 'utf8');
+				expect(configFile).toMatch(`AZURE_OPENAI_ENDPOINT="${endpoint}"`);
+
+				const get = await aicommits(['config', 'get', 'AZURE_OPENAI_ENDPOINT']);
+				expect(get.stdout).toBe(`AZURE_OPENAI_ENDPOINT=${endpoint}`);
+			});
+		});
+
 		await fixture.rm();
 	});
 });

@@ -167,7 +167,7 @@ aicommits config set OPENAI_KEY=<your-api-key> generate=3 locale=en
 
 #### OPENAI_KEY
 
-Required
+It is required unless you opt to use Azure OpenAI.
 
 The OpenAI API key. You can retrieve it from [OpenAI API Keys page](https://platform.openai.com/account/api-keys).
 
@@ -237,6 +237,43 @@ You can clear this option by setting it to an empty string:
 
 ```sh
 aicommits config set type=
+```
+
+#### USE_AZURE
+
+Default: `false`
+
+The USE_AZURE parameter specifies whether the application will use Azure OpenAI instead of the standard OpenAI API.
+It accepts true or false as values.
+
+```sh
+aicommits config set USE_AZURE=true
+```
+
+You can toggle between OpenAI and Azure OpenAI using that flag.
+
+```sh
+aicommits config set USE_AZURE=false
+```
+
+#### AZURE_OPENAI_KEY
+
+Required if USE_AZURE=`true`
+
+The Azure OpenAI authentication key.
+
+```sh
+aicommits config set AZURE_OPENAI_KEY=<your token>
+```
+
+#### AZURE_OPENAI_ENDPOINT
+
+Required if USE_AZURE=`true`
+
+The endpoint URL for your Azure OpenAI deployment. Set it within quotation marks.
+
+```sh
+aicommits config set AZURE_OPENAI_ENDPOINT='<your-deployment-full-url>'
 ```
 
 ## How it works

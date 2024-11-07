@@ -132,22 +132,19 @@ export default testSuite(({ describe }) => {
 			configOverrides: Partial<ValidConfig> = {}
 		): Promise<string> {
 			const config = {
+				OPENAI_KEY: OPENAI_KEY!,
+				model: 'gpt-3.5-turbo',
 				locale: 'en',
 				type: 'conventional',
 				generate: 1,
 				'max-length': 50,
+				timeout: 7000,
 				...configOverrides,
 			} as ValidConfig;
-			const commitMessages = await generateCommitMessage(
-				OPENAI_KEY!,
-				'gpt-3.5-turbo',
-				config.locale,
-				gitDiff,
-				config.generate,
-				config['max-length'],
-				config.type,
-				7000
-			);
+
+			config.OPENAI_KEY = OPENAI_KEY!;
+
+			const commitMessages = await generateCommitMessage(config, gitDiff);
 
 			return commitMessages[0];
 		}

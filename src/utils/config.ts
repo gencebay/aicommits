@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import path from 'path';
+import path, { parse } from 'path';
 import os from 'os';
 import ini from 'ini';
 import type { TiktokenModel } from '@dqbd/tiktoken';
@@ -23,9 +23,8 @@ const parseAssert = (name: string, condition: any, message: string) => {
 const configParsers = {
 	OPENAI_KEY(key?: string) {
 		if (!key) {
-			throw new KnownError(
-				'Please set your OpenAI API key via `aicommits config set OPENAI_KEY=<your token>`'
-			);
+			// if USE_AZURE config is set to true, then we don't need to check for OPENAI_KEY
+			return '';
 		}
 		parseAssert('OPENAI_KEY', key.startsWith('sk-'), 'Must start with "sk-"');
 		// Key can range from 43~51 characters. There's no spec to assert this.
@@ -58,7 +57,7 @@ const configParsers = {
 
 		return parsed;
 	},
-	type(type?: string) {
+	type(type?: string): CommitType {
 		if (!type) {
 			return '';
 		}
@@ -117,14 +116,52 @@ const configParsers = {
 	},
 } as const;
 
-type ConfigKeys = keyof typeof configParsers;
+const azureConfigParsers = {
+	USE_AZURE(useAzure?: string) {
+		if (useAzure === undefined) {
+			return false;
+		}
+		const normalizedValue = String(useAzure).toLowerCase();
+		parseAssert(
+			'USE_AZURE',
+			normalizedValue === 'true' || normalizedValue === 'false',
+			'Must be true or false'
+		);
+		return normalizedValue === 'true';
+	},
+	AZURE_OPENAI_KEY(key?: string) {
+		if (!key) {
+			return '';
+		}
+		parseAssert('AZURE_OPENAI_KEY', key.length > 0, 'Cannot be empty');
+		return key;
+	},
+	AZURE_OPENAI_ENDPOINT(endpoint?: string) {
+		if (!endpoint) {
+			return '';
+		}
+		parseAssert(
+			'AZURE_OPENAI_ENDPOINT',
+			/^https?:\/\//.test(endpoint),
+			'Must be a valid URL'
+		);
+		return endpoint;
+	},
+} as const;
+
+const combinedParsers = {
+	...azureConfigParsers,
+	...configParsers,
+};
+
+type ConfigKeys = keyof typeof combinedParsers;
 
 type RawConfig = {
 	[key in ConfigKeys]?: string;
 };
 
 export type ValidConfig = {
-	[Key in ConfigKeys]: ReturnType<(typeof configParsers)[Key]>;
+	[Key in ConfigKeys]: ReturnType<(typeof combinedParsers)[Key]>;
 };
 
 const configPath = path.join(os.homedir(), '.aicommits');
@@ -146,8 +183,8 @@ export const getConfig = async (
 	const config = await readConfigFile();
 	const parsedConfig: Record<string, unknown> = {};
 
-	for (const key of Object.keys(configParsers) as ConfigKeys[]) {
-		const parser = configParsers[key];
+	for (const key of Object.keys(combinedParsers) as ConfigKeys[]) {
+		const parser = combinedParsers[key];
 		const value = cliConfig?.[key] ?? config[key];
 
 		if (suppressErrors) {
@@ -159,6 +196,14 @@ export const getConfig = async (
 		}
 	}
 
+	const openaiKey = parsedConfig['OPENAI_KEY'] as string;
+	const useAzure = parsedConfig['USE_AZURE'] as boolean;
+	if (openaiKey === '' && !useAzure) {
+		throw new KnownError(
+			'Please set your OpenAI API key via `aicommits config set OPENAI_KEY=<your token>` or set your Azure OpenAI configurations.'
+		);
+	}
+
 	return parsedConfig as ValidConfig;
 };
 
@@ -166,11 +211,11 @@ export const setConfigs = async (keyValues: [key: string, value: string][]) => {
 	const config = await readConfigFile();
 
 	for (const [key, value] of keyValues) {
-		if (!hasOwn(configParsers, key)) {
+		if (!hasOwn(combinedParsers, key)) {
 			throw new KnownError(`Invalid config property: ${key}`);
 		}
 
-		const parsed = configParsers[key as ConfigKeys](value);
+		const parsed = combinedParsers[key as ConfigKeys](value);
 		config[key as ConfigKeys] = parsed as any;
 	}
 

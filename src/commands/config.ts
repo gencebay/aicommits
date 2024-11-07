@@ -25,7 +25,18 @@ export default command(
 
 			if (mode === 'set') {
 				await setConfigs(
-					keyValues.map((keyValue) => keyValue.split('=') as [string, string])
+					keyValues.map((keyValue) => {
+						const [key, ...valueParts] = keyValue.split('=');
+						let value = valueParts.join('=');
+						
+						if (value.startsWith("'") && value.endsWith("'")) {
+							value = value.slice(1, -1);
+						} else if (value.startsWith('"') && value.endsWith('"')) {
+							value = value.slice(1, -1);
+						}
+						
+						return [key, value] as [string, string];
+					})
 				);
 				return;
 			}
