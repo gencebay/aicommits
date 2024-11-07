@@ -199,9 +199,29 @@ export const getConfig = async (
 	const openaiKey = parsedConfig['OPENAI_KEY'] as string;
 	const useAzure = parsedConfig['USE_AZURE'] as boolean;
 	if (openaiKey === '' && !useAzure) {
-		throw new KnownError(
-			'Please set your OpenAI API key via `aicommits config set OPENAI_KEY=<your token>` or set your Azure OpenAI configurations.'
-		);
+		if (!suppressErrors) {
+			throw new KnownError(
+				'Please set your OpenAI API key via `aicommits config set OPENAI_KEY=<your token>` or set your Azure OpenAI configurations.'
+			);
+		}
+	}
+
+	const azureOpenaiKey = parsedConfig['AZURE_OPENAI_KEY'] as string;
+	const azureOpenaiEndpoint = parsedConfig['AZURE_OPENAI_ENDPOINT'] as string;
+	if (useAzure) {
+		if (!suppressErrors) {
+			if (azureOpenaiKey === '') {
+				throw new KnownError(
+					`Please set your Azure OpenAI configurations via aicommits config set AZURE_OPENAI_KEY=<your token>`
+				);
+			}
+
+			if (azureOpenaiEndpoint === '') {
+				throw new KnownError(
+					`Please set your Azure OpenAI configurations via aicommits config set AZURE_OPENAI_ENDPOINT='<your-deployment-full-url>'`
+				);
+			}
+		}
 	}
 
 	return parsedConfig as ValidConfig;
